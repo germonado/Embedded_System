@@ -1,0 +1,80 @@
+
+semi.elf:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <isr_vectors>:
+   0:	00 00 00 00 55 00 00 00                             ....U...
+
+00000008 <semihost_call>:
+#include <stdint.h>
+
+static int semihost_call(int service, void* opaque)
+{
+   8:	b480      	push	{r7}
+   a:	b083      	sub	sp, #12
+   c:	af00      	add	r7, sp, #0
+   e:	6078      	str	r0, [r7, #4]
+  10:	6039      	str	r1, [r7, #0]
+    register int r0 asm("r0") = service;
+  12:	6878      	ldr	r0, [r7, #4]
+    register void *r1 asm("r1") = opaque;
+  14:	6839      	ldr	r1, [r7, #0]
+    register int result asm("r0");
+    asm volatile("bkpt 0xab" : "=r" (result) : "r" (r0), "r" (r1));
+  16:	beab      	bkpt	0x00ab
+    return result;
+  18:	4603      	mov	r3, r0
+}
+  1a:	4618      	mov	r0, r3
+  1c:	370c      	adds	r7, #12
+  1e:	46bd      	mov	sp, r7
+  20:	bc80      	pop	{r7}
+  22:	4770      	bx	lr
+
+00000024 <main>:
+enum SEMIHOST_SVC{
+    SYS_WRITE = 0x05,
+};
+
+void main(void)
+{
+  24:	b590      	push	{r4, r7, lr}
+  26:	b089      	sub	sp, #36	; 0x24
+  28:	af00      	add	r7, sp, #0
+    char message[] = "Hello World!\n";
+  2a:	4b09      	ldr	r3, [pc, #36]	; (50 <main+0x2c>)
+  2c:	f107 0410 	add.w	r4, r7, #16
+  30:	cb0f      	ldmia	r3, {r0, r1, r2, r3}
+  32:	c407      	stmia	r4!, {r0, r1, r2}
+  34:	8023      	strh	r3, [r4, #0]
+    uint32_t param[] = {1, (uint32_t)message, sizeof(message)};
+  36:	2301      	movs	r3, #1
+  38:	607b      	str	r3, [r7, #4]
+  3a:	f107 0310 	add.w	r3, r7, #16
+  3e:	60bb      	str	r3, [r7, #8]
+  40:	230e      	movs	r3, #14
+  42:	60fb      	str	r3, [r7, #12]
+    semihost_call(SYS_WRITE, (void*)param);
+  44:	1d3b      	adds	r3, r7, #4
+  46:	4619      	mov	r1, r3
+  48:	2005      	movs	r0, #5
+  4a:	f7ff ffdd 	bl	8 <semihost_call>
+    while(1);
+  4e:	e7fe      	b.n	4e <main+0x2a>
+  50:	00000060 	.word	0x00000060
+
+00000054 <reset_handler>:
+#include <stdint.h>
+
+extern void main(void);
+void reset_handler(void)
+{
+  54:	b580      	push	{r7, lr}
+  56:	af00      	add	r7, sp, #0
+    main();
+  58:	f7ff ffe4 	bl	24 <main>
+}
+  5c:	bf00      	nop
+  5e:	bd80      	pop	{r7, pc}

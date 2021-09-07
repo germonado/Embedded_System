@@ -1,0 +1,134 @@
+
+semi.elf:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <isr_vectors>:
+   0:	00 20 00 20 4d 00 00 00                             . . M...
+
+00000008 <semihost_call>:
+#include <stdint.h>
+
+static int semihost_call(int service, void* opaque)
+{
+   8:	b480      	push	{r7}
+   a:	b083      	sub	sp, #12
+   c:	af00      	add	r7, sp, #0
+   e:	6078      	str	r0, [r7, #4]
+  10:	6039      	str	r1, [r7, #0]
+    register int r0 asm("r0") = service;
+  12:	6878      	ldr	r0, [r7, #4]
+    register void *r1 asm("r1") = opaque;
+  14:	6839      	ldr	r1, [r7, #0]
+    register int result asm("r0");
+    asm volatile("bkpt 0xab" : "=r" (result) : "r" (r0), "r" (r1));
+  16:	beab      	bkpt	0x00ab
+    return result;
+  18:	4603      	mov	r3, r0
+}
+  1a:	4618      	mov	r0, r3
+  1c:	370c      	adds	r7, #12
+  1e:	46bd      	mov	sp, r7
+  20:	bc80      	pop	{r7}
+  22:	4770      	bx	lr
+
+00000024 <main>:
+
+char g_message[] = "Hello World!\n";
+uint32_t g_param[3];
+
+void main(void)
+{
+  24:	b580      	push	{r7, lr}
+  26:	af00      	add	r7, sp, #0
+	g_param[0] = 1;
+  28:	4b06      	ldr	r3, [pc, #24]	; (44 <main+0x20>)
+  2a:	2201      	movs	r2, #1
+  2c:	601a      	str	r2, [r3, #0]
+	g_param[1] = g_message;
+  2e:	4a06      	ldr	r2, [pc, #24]	; (48 <main+0x24>)
+  30:	4b04      	ldr	r3, [pc, #16]	; (44 <main+0x20>)
+  32:	605a      	str	r2, [r3, #4]
+	g_param[2] = sizeof(g_message);
+  34:	4b03      	ldr	r3, [pc, #12]	; (44 <main+0x20>)
+  36:	220e      	movs	r2, #14
+  38:	609a      	str	r2, [r3, #8]
+    //char message[] = "Hello World!\n";
+    //uint32_t param[] = {1, (uint32_t)g_message, sizeof(g_message)};
+    semihost_call(SYS_WRITE, (void*)g_param);
+  3a:	4902      	ldr	r1, [pc, #8]	; (44 <main+0x20>)
+  3c:	2005      	movs	r0, #5
+  3e:	f7ff ffe3 	bl	8 <semihost_call>
+    while(1);
+  42:	e7fe      	b.n	42 <main+0x1e>
+  44:	20000010 	.word	0x20000010
+  48:	20000000 	.word	0x20000000
+
+0000004c <reset_handler>:
+extern uint32_t _sbss;
+extern uint32_t _ebss;
+
+extern void main(void);
+void reset_handler(void)
+{
+  4c:	b580      	push	{r7, lr}
+  4e:	b086      	sub	sp, #24
+  50:	af00      	add	r7, sp, #0
+	/* Copy the data segment initializers from flash to SRAM */
+	uint32_t *idata_begin = &_sidata;
+  52:	4b13      	ldr	r3, [pc, #76]	; (a0 <reset_handler+0x54>)
+  54:	617b      	str	r3, [r7, #20]
+	uint32_t *data_begin = &_sdata;
+  56:	4b13      	ldr	r3, [pc, #76]	; (a4 <reset_handler+0x58>)
+  58:	613b      	str	r3, [r7, #16]
+	uint32_t *data_end = &_edata;
+  5a:	4b13      	ldr	r3, [pc, #76]	; (a8 <reset_handler+0x5c>)
+  5c:	60bb      	str	r3, [r7, #8]
+	while(data_begin < data_end) *data_begin++ = *idata_begin++;
+  5e:	e007      	b.n	70 <reset_handler+0x24>
+  60:	693b      	ldr	r3, [r7, #16]
+  62:	1d1a      	adds	r2, r3, #4
+  64:	613a      	str	r2, [r7, #16]
+  66:	697a      	ldr	r2, [r7, #20]
+  68:	1d11      	adds	r1, r2, #4
+  6a:	6179      	str	r1, [r7, #20]
+  6c:	6812      	ldr	r2, [r2, #0]
+  6e:	601a      	str	r2, [r3, #0]
+  70:	693a      	ldr	r2, [r7, #16]
+  72:	68bb      	ldr	r3, [r7, #8]
+  74:	429a      	cmp	r2, r3
+  76:	d3f3      	bcc.n	60 <reset_handler+0x14>
+
+	/* Zero fill the bss segment */
+	uint32_t *bss_begin = &_sbss;
+  78:	4b0c      	ldr	r3, [pc, #48]	; (ac <reset_handler+0x60>)
+  7a:	60fb      	str	r3, [r7, #12]
+	uint32_t *bss_end = &_ebss;
+  7c:	4b0c      	ldr	r3, [pc, #48]	; (b0 <reset_handler+0x64>)
+  7e:	607b      	str	r3, [r7, #4]
+	while(bss_begin < bss_end) *bss_begin++ = 0;
+  80:	e004      	b.n	8c <reset_handler+0x40>
+  82:	68fb      	ldr	r3, [r7, #12]
+  84:	1d1a      	adds	r2, r3, #4
+  86:	60fa      	str	r2, [r7, #12]
+  88:	2200      	movs	r2, #0
+  8a:	601a      	str	r2, [r3, #0]
+  8c:	68fa      	ldr	r2, [r7, #12]
+  8e:	687b      	ldr	r3, [r7, #4]
+  90:	429a      	cmp	r2, r3
+  92:	d3f6      	bcc.n	82 <reset_handler+0x36>
+
+	/* jump to C entry point */
+    main();
+  94:	f7ff ffc6 	bl	24 <main>
+}
+  98:	bf00      	nop
+  9a:	3718      	adds	r7, #24
+  9c:	46bd      	mov	sp, r7
+  9e:	bd80      	pop	{r7, pc}
+  a0:	000000b4 	.word	0x000000b4
+  a4:	20000000 	.word	0x20000000
+  a8:	2000000e 	.word	0x2000000e
+  ac:	20000010 	.word	0x20000010
+  b0:	2000001c 	.word	0x2000001c
